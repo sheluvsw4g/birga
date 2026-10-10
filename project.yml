@@ -4,7 +4,7 @@ options:
   xcodeVersion: "15.4"
 targets:
   TonRateCore:
-    type: framework
+    type: framework.static
     platform: iOS
     deploymentTarget: "16.0"
     sources:
@@ -13,6 +13,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sheluvsw4g.TonRateCore
         SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: YES
         CODE_SIGNING_ALLOWED: NO
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGN_IDENTITY: ""
@@ -27,6 +28,7 @@ targets:
           - "Info.plist"
     dependencies:
       - target: TonRateCore
+        embed: false
     info:
       path: Sources/TonRateTrackerApp/Info.plist
     settings:

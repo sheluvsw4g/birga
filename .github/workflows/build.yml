@@ -64,6 +64,16 @@ jobs:
         run: |
           mkdir -p Payload
           cp -r build/Build/Products/Release-iphoneos/TonRateTracker.app Payload/
+          # Ensure any framework inside Frameworks has an Info.plist or remove static artifact
+          if [ -d "Payload/TonRateTracker.app/Frameworks" ]; then
+            for fw in Payload/TonRateTracker.app/Frameworks/*.framework; do
+              if [ -d "$fw" ] && [ ! -f "$fw/Info.plist" ]; then
+                echo "Removing framework without Info.plist: $fw"
+                rm -rf "$fw"
+              fi
+            done
+            rmdir Payload/TonRateTracker.app/Frameworks 2>/dev/null || true
+          fi
           zip -r TonRateTracker.ipa Payload
           ls -la TonRateTracker.ipa
 
