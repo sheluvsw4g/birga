@@ -1,0 +1,40 @@
+name: TonRateTracker
+options:
+  bundleIdPrefix: com.sheluvsw4g
+targets:
+  TonRateCore:
+    type: framework
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Sources/TonRateCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sheluvsw4g.TonRateCore
+        SWIFT_VERSION: "5.9"
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+
+  TonRateTracker:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Sources/TonRateTrackerApp
+        excludes:
+          - "Info.plist"
+    dependencies:
+      - target: TonRateCore
+    info:
+      path: Sources/TonRateTrackerApp/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sheluvsw4g.tonratetracker
+        PRODUCT_NAME: "TonRateTracker"
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Sources/TonRateTrackerApp/Info.plist
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""

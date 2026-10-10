@@ -1,4 +1,4 @@
-name: Build and Test Swift App
+name: Build Swift App (macOS & iOS IPA)
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   test_and_build:
-    name: Build & Test on macOS Runner
+    name: Build & Package on macOS Runner
     runs-on: macos-14
 
     steps:
@@ -23,24 +23,53 @@ jobs:
           echo "=== Xcode Version ==="
           xcodebuild -version
 
-      - name: Resolve Swift Package dependencies
-        run: swift package resolve
-
       - name: Run Unit Tests
         run: swift test -v
 
-      - name: Build Release Binary
+      - name: Build macOS Release Binary
         run: swift build -c release --product TonRateTracker
 
-      - name: Prepare Artifacts
+      - name: Install XcodeGen
+        run: which xcodegen || brew install xcodegen
+
+      - name: Generate Xcode Project for iOS
+        run: xcodegen generate
+
+      - name: Build iOS Application
+        run: |
+          xcodebuild clean build \
+            -project TonRateTracker.xcodeproj \
+            -scheme TonRateTracker \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER=""
+
+      - name: Package iOS IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/Build/Products/Release-iphoneos/TonRateTracker.app Payload/
+          zip -r TonRateTracker.ipa Payload
+          ls -la TonRateTracker.ipa
+
+      - name: Prepare macOS Artifacts
         run: |
           mkdir -p artifacts
           cp .build/release/TonRateTracker artifacts/
           cd artifacts
           zip -r TonRateTracker-macOS.zip TonRateTracker
-          ls -la
 
-      - name: Upload Build Artifacts
+      - name: Upload iOS IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TonRateTracker-iOS-IPA
+          path: TonRateTracker.ipa
+          retention-days: 14
+
+      - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
         with:
           name: TonRateTracker-macOS
