@@ -4,7 +4,7 @@ import XCTest
 final class TonRateCoreTests: XCTestCase {
 
     @MainActor
-    func testConversionCalculation() {
+    func testConversionCalculation() async {
         let viewModel = CryptoViewModel()
         let ton = CryptoItem(id: "ton", symbol: "TON", name: "Toncoin", emoji: "💎", priceUSD: 5.0)
         let usdt = CryptoItem(id: "usdt", symbol: "USDT", name: "Tether", emoji: "💵", priceUSD: 1.0)
@@ -19,7 +19,7 @@ final class TonRateCoreTests: XCTestCase {
     }
 
     @MainActor
-    func testReverseConversionCalculation() {
+    func testReverseConversionCalculation() async {
         let viewModel = CryptoViewModel()
         let ton = CryptoItem(id: "ton", symbol: "TON", name: "Toncoin", emoji: "💎", priceUSD: 5.0)
         let usdt = CryptoItem(id: "usdt", symbol: "USDT", name: "Tether", emoji: "💵", priceUSD: 1.0)
@@ -34,7 +34,7 @@ final class TonRateCoreTests: XCTestCase {
     }
 
     @MainActor
-    func testSwapCurrencies() {
+    func testSwapCurrencies() async {
         let viewModel = CryptoViewModel()
         let ton = CryptoItem(id: "ton", symbol: "TON", name: "Toncoin", emoji: "💎", priceUSD: 5.0)
         let usdt = CryptoItem(id: "usdt", symbol: "USDT", name: "Tether", emoji: "💵", priceUSD: 1.0)
@@ -49,7 +49,7 @@ final class TonRateCoreTests: XCTestCase {
     }
 
     @MainActor
-    func testArbitrageAndSpread() {
+    func testArbitrageAndSpread() async {
         let viewModel = CryptoViewModel()
         viewModel.exchangeTickers = [
             ExchangeTicker(exchange: "Binance", pair: "TON/USDT", price: 5.0, change24h: 1.0),

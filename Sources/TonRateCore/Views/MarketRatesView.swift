@@ -43,7 +43,11 @@ public struct MarketRatesView: View {
                     }
                 }
             }
+            #if os(iOS)
             .listStyle(.insetGrouped)
+            #else
+            .listStyle(.inset)
+            #endif
             .searchable(text: $searchText, prompt: "Поиск криптовалюты...")
             .navigationTitle("Котировки")
             .refreshable {
