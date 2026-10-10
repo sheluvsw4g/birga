@@ -50,11 +50,13 @@ public struct ExchangeCompareView: View {
             }
             .navigationTitle("Биржи TON")
             .refreshable {
+                HapticManager.impact(style: .medium)
                 await viewModel.loadData()
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: {
+                        HapticManager.impact(style: .light)
                         Task { await viewModel.loadData() }
                     }) {
                         Image(systemName: "arrow.clockwise")
@@ -131,7 +133,9 @@ public struct ExchangeTickerCard: View {
 
     public var body: some View {
         VStack(spacing: 12) {
-            HStack {
+            HStack(spacing: 12) {
+                CryptoIconView(symbol: "TON", size: 36)
+
                 VStack(alignment: .leading, spacing: 2) {
                     Text(ticker.exchange)
                         .font(.headline.bold())

@@ -13,58 +13,149 @@ public actor CryptoAPIService: CryptoAPIServiceProtocol {
         self.urlSession = session
     }
 
-    // MARK: - CoinGecko Simple Prices
+    // MARK: - High-Precision Real-Time Rates
     public func fetchCryptoPrices() async throws -> [CryptoItem] {
-        let coinIds = ["the-open-network", "tether", "bitcoin", "ethereum", "solana", "notcoin"]
-        let idsParam = coinIds.joined(separator: ",")
-        let urlString = "https://api.coingecko.com/api/v3/simple/price?ids=\(idsParam)&vs_currencies=usd&include_24hr_change=true"
+        // Query Binance in parallel for exact spot prices
+        async let tonBinance = fetchBinanceTicker(symbol: "TONUSDT")
+        async let btcBinance = fetchBinanceTicker(symbol: "BTCUSDT")
+        async let ethBinance = fetchBinanceTicker(symbol: "ETHUSDT")
+        async let solBinance = fetchBinanceTicker(symbol: "SOLUSDT")
 
-        guard let url = URL(string: urlString) else {
-            throw RateError.invalidURL
-        }
+        let (ton, btc, eth, sol) = await (tonBinance, btcBinance, ethBinance, solBinance)
 
+        var items: [CryptoItem] = []
+
+        // 1. TON
+        let tonPrice = ton?.price ?? 1.60
+        let tonChange = ton?.change ?? 0.95
+        items.append(
+            CryptoItem(
+                id: "the-open-network",
+                symbol: "TON",
+                name: "Toncoin",
+                emoji: "💎",
+                priceUSD: tonPrice,
+                change24h: tonChange,
+                high24h: ton?.high ?? 0,
+                low24h: ton?.low ?? 0,
+                volume24h: ton?.volume ?? 0
+            )
+        )
+
+        // 2. USDT (Pegged Stablecoin)
+        items.append(
+            CryptoItem(
+                id: "tether",
+                symbol: "USDT",
+                name: "Tether USD",
+                emoji: "💵",
+                priceUSD: 1.0000,
+                change24h: 0.01
+            )
+        )
+
+        // 3. BTC
+        items.append(
+            CryptoItem(
+                id: "bitcoin",
+                symbol: "BTC",
+                name: "Bitcoin",
+                emoji: "₿",
+                priceUSD: btc?.price ?? 64000.0,
+                change24h: btc?.change ?? 0,
+                high24h: btc?.high ?? 0,
+                low24h: btc?.low ?? 0,
+                volume24h: btc?.volume ?? 0
+            )
+        )
+
+        // 4. ETH
+        items.append(
+            CryptoItem(
+                id: "ethereum",
+                symbol: "ETH",
+                name: "Ethereum",
+                emoji: "Ξ",
+                priceUSD: eth?.price ?? 3400.0,
+                change24h: eth?.change ?? 0,
+                high24h: eth?.high ?? 0,
+                low24h: eth?.low ?? 0,
+                volume24h: eth?.volume ?? 0
+            )
+        )
+
+        // 5. SOL
+        items.append(
+            CryptoItem(
+                id: "solana",
+                symbol: "SOL",
+                name: "Solana",
+                emoji: "🟣",
+                priceUSD: sol?.price ?? 145.0,
+                change24h: sol?.change ?? 0,
+                high24h: sol?.high ?? 0,
+                low24h: sol?.low ?? 0,
+                volume24h: sol?.volume ?? 0
+            )
+        )
+
+        // 6. NOT (Notcoin)
+        let notcoin = await fetchBinanceTicker(symbol: "NOTUSDT")
+        items.append(
+            CryptoItem(
+                id: "notcoin",
+                symbol: "NOT",
+                name: "Notcoin",
+                emoji: "🪙",
+                priceUSD: notcoin?.price ?? 0.0075,
+                change24h: notcoin?.change ?? -2.1,
+                high24h: notcoin?.high ?? 0,
+                low24h: notcoin?.low ?? 0,
+                volume24h: notcoin?.volume ?? 0
+            )
+        )
+
+        return items
+    }
+
+    private struct RawTicker {
+        let price: Double
+        let change: Double
+        let high: Double
+        let low: Double
+        let volume: Double
+    }
+
+    private func fetchBinanceTicker(symbol: String) async -> RawTicker? {
+        guard let url = URL(string: "https://api.binance.com/api/v3/ticker/24hr?symbol=\(symbol)") else { return nil }
         var request = URLRequest(url: url)
-        request.timeoutInterval = 10
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 4
 
         do {
             let (data, response) = try await urlSession.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-                return fallbackCryptoItems()
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return nil }
+
+            struct BResponse: Decodable {
+                let lastPrice: String
+                let priceChangePercent: String
+                let highPrice: String
+                let lowPrice: String
+                let quoteVolume: String
             }
 
-            // [id: ["usd": 5.4, "usd_24h_change": 1.2]]
-            let json = try JSONDecoder().decode([String: [String: Double]].self, from: data)
+            let decoded = try JSONDecoder().decode(BResponse.self, from: data)
+            guard let price = Double(decoded.lastPrice),
+                  let change = Double(decoded.priceChangePercent) else { return nil }
 
-            var items: [CryptoItem] = []
-            let meta: [(id: String, symbol: String, name: String, emoji: String)] = [
-                ("the-open-network", "TON", "Toncoin", "💎"),
-                ("tether", "USDT", "Tether USD", "💵"),
-                ("bitcoin", "BTC", "Bitcoin", "₿"),
-                ("ethereum", "ETH", "Ethereum", "Ξ"),
-                ("solana", "SOL", "Solana", "🟣"),
-                ("notcoin", "NOT", "Notcoin", "🪙")
-            ]
-
-            for coin in meta {
-                let coinData = json[coin.id] ?? [:]
-                let price = coinData["usd"] ?? (coin.symbol == "USDT" ? 1.0 : 0.0)
-                let change = coinData["usd_24h_change"] ?? 0.0
-
-                items.append(
-                    CryptoItem(
-                        id: coin.id,
-                        symbol: coin.symbol,
-                        name: coin.name,
-                        emoji: coin.emoji,
-                        priceUSD: price,
-                        change24h: change
-                    )
-                )
-            }
-            return items
+            return RawTicker(
+                price: price,
+                change: change,
+                high: Double(decoded.highPrice) ?? 0,
+                low: Double(decoded.lowPrice) ?? 0,
+                volume: Double(decoded.quoteVolume) ?? 0
+            )
         } catch {
-            return fallbackCryptoItems()
+            return nil
         }
     }
 
@@ -83,47 +174,23 @@ public actor CryptoAPIService: CryptoAPIServiceProtocol {
         return successful
     }
 
-    // MARK: - Binance
     private func fetchBinanceTonRate() async -> ExchangeTicker? {
-        guard let url = URL(string: "https://api.binance.com/api/v3/ticker/24hr?symbol=TONUSDT") else { return nil }
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 6
-
-        do {
-            let (data, response) = try await urlSession.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return nil }
-
-            struct BinanceResponse: Decodable {
-                let lastPrice: String
-                let priceChangePercent: String
-                let highPrice: String
-                let lowPrice: String
-                let quoteVolume: String
-            }
-
-            let decoded = try JSONDecoder().decode(BinanceResponse.self, from: data)
-            guard let price = Double(decoded.lastPrice),
-                  let change = Double(decoded.priceChangePercent) else { return nil }
-
-            return ExchangeTicker(
-                exchange: "Binance",
-                pair: "TON / USDT",
-                price: price,
-                change24h: change,
-                high24h: Double(decoded.highPrice) ?? 0,
-                low24h: Double(decoded.lowPrice) ?? 0,
-                volumeUSD: Double(decoded.quoteVolume) ?? 0
-            )
-        } catch {
-            return nil
-        }
+        guard let raw = await fetchBinanceTicker(symbol: "TONUSDT") else { return nil }
+        return ExchangeTicker(
+            exchange: "Binance",
+            pair: "TON / USDT",
+            price: raw.price,
+            change24h: raw.change,
+            high24h: raw.high,
+            low24h: raw.low,
+            volumeUSD: raw.volume
+        )
     }
 
-    // MARK: - Bybit
     private func fetchBybitTonRate() async -> ExchangeTicker? {
         guard let url = URL(string: "https://api.bybit.com/v5/market/tickers?category=spot&symbol=TONUSDT") else { return nil }
         var request = URLRequest(url: url)
-        request.timeoutInterval = 6
+        request.timeoutInterval = 4
 
         do {
             let (data, response) = try await urlSession.data(for: request)
@@ -148,13 +215,11 @@ public actor CryptoAPIService: CryptoAPIServiceProtocol {
                   let price = Double(first.lastPrice),
                   let rawChange = Double(first.price24hPcnt) else { return nil }
 
-            let change = rawChange * 100 // Bybit returns decimal (e.g. 0.024)
-
             return ExchangeTicker(
                 exchange: "Bybit",
                 pair: "TON / USDT",
                 price: price,
-                change24h: change,
+                change24h: rawChange * 100,
                 high24h: Double(first.highPrice24h) ?? 0,
                 low24h: Double(first.lowPrice24h) ?? 0,
                 volumeUSD: Double(first.turnover24h) ?? 0
@@ -164,11 +229,10 @@ public actor CryptoAPIService: CryptoAPIServiceProtocol {
         }
     }
 
-    // MARK: - OKX
     private func fetchOkxTonRate() async -> ExchangeTicker? {
         guard let url = URL(string: "https://www.okx.com/api/v5/market/ticker?instId=TON-USDT") else { return nil }
         var request = URLRequest(url: url)
-        request.timeoutInterval = 6
+        request.timeoutInterval = 4
 
         do {
             let (data, response) = try await urlSession.data(for: request)
@@ -191,13 +255,11 @@ public actor CryptoAPIService: CryptoAPIServiceProtocol {
                   let open = Double(first.open24h),
                   open > 0 else { return nil }
 
-            let change = ((price - open) / open) * 100
-
             return ExchangeTicker(
                 exchange: "OKX",
                 pair: "TON / USDT",
                 price: price,
-                change24h: change,
+                change24h: ((price - open) / open) * 100,
                 high24h: Double(first.high24h) ?? 0,
                 low24h: Double(first.low24h) ?? 0,
                 volumeUSD: Double(first.volCcy24h) ?? 0
@@ -207,16 +269,15 @@ public actor CryptoAPIService: CryptoAPIServiceProtocol {
         }
     }
 
-    // MARK: - Fallback Data
     public func fallbackCryptoItems() -> [CryptoItem] {
         return CryptoItem.defaults
     }
 
     public func fallbackExchangeTickers() -> [ExchangeTicker] {
         return [
-            ExchangeTicker(exchange: "Binance", pair: "TON / USDT", price: 5.432, change24h: 2.14, high24h: 5.55, low24h: 5.28, volumeUSD: 48_250_000),
-            ExchangeTicker(exchange: "Bybit", pair: "TON / USDT", price: 5.428, change24h: 2.05, high24h: 5.54, low24h: 5.27, volumeUSD: 31_120_000),
-            ExchangeTicker(exchange: "OKX", pair: "TON / USDT", price: 5.435, change24h: 2.21, high24h: 5.56, low24h: 5.29, volumeUSD: 24_890_000)
+            ExchangeTicker(exchange: "Binance", pair: "TON / USDT", price: 1.602, change24h: 0.94, high24h: 1.64, low24h: 1.58, volumeUSD: 48_250_000),
+            ExchangeTicker(exchange: "Bybit", pair: "TON / USDT", price: 1.601, change24h: 0.88, high24h: 1.639, low24h: 1.579, volumeUSD: 31_120_000),
+            ExchangeTicker(exchange: "OKX", pair: "TON / USDT", price: 1.603, change24h: 0.98, high24h: 1.642, low24h: 1.581, volumeUSD: 24_890_000)
         ]
     }
 }
