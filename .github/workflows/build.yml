@@ -1,0 +1,48 @@
+name: Build and Test Swift App
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  test_and_build:
+    name: Build & Test on macOS Runner
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Display environment info
+        run: |
+          echo "=== Swift Version ==="
+          swift --version
+          echo "=== Xcode Version ==="
+          xcodebuild -version
+
+      - name: Resolve Swift Package dependencies
+        run: swift package resolve
+
+      - name: Run Unit Tests
+        run: swift test -v
+
+      - name: Build Release Binary
+        run: swift build -c release --product TonRateTracker
+
+      - name: Prepare Artifacts
+        run: |
+          mkdir -p artifacts
+          cp .build/release/TonRateTracker artifacts/
+          cd artifacts
+          zip -r TonRateTracker-macOS.zip TonRateTracker
+          ls -la
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: TonRateTracker-macOS
+          path: artifacts/TonRateTracker-macOS.zip
+          retention-days: 14
