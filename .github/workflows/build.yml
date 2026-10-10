@@ -16,12 +16,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Display environment info
+      - name: Select Xcode Version
         run: |
+          echo "Available Xcode installations:"
+          ls -d /Applications/Xcode*
+          if [ -d "/Applications/Xcode_16.0.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_16.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_16.1.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
+          fi
+          echo "=== Selected Xcode Version ==="
+          xcodebuild -version
           echo "=== Swift Version ==="
           swift --version
-          echo "=== Xcode Version ==="
-          xcodebuild -version
 
       - name: Run Unit Tests
         run: swift test -v
@@ -33,7 +42,10 @@ jobs:
         run: which xcodegen || brew install xcodegen
 
       - name: Generate Xcode Project for iOS
-        run: xcodegen generate
+        run: |
+          xcodegen generate
+          # Ensure backwards compatibility with Xcode 15 if format 77 was generated
+          sed -i '' 's/objectVersion = 77;/objectVersion = 56;/g' TonRateTracker.xcodeproj/project.pbxproj || true
 
       - name: Build iOS Application
         run: |
